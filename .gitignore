@@ -1,0 +1,6 @@
+.vscode
+.github
+.idea
+*.log
+target/*
+/target

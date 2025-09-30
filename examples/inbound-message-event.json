@@ -1,0 +1,18 @@
+{
+    "app": "TestApp",
+    "timestamp": 1747854609182,
+    "version": 2,
+    "type": "message",
+    "payload": {
+        "id": "wamid.HBgMNTkzxhgfjg3Nxc5NzU3FZCqEazxcE1ODg0QUIzQTg4NjUa4NUR1BQzYB",
+        "source": "123456789011",
+        "type": "text",
+        "payload": { "text": "3" },
+        "sender": { 
+            "phone": "123456789011",
+            "name": "Online UserName",
+            "country_code": "1",
+            "dial_code": "23456789011"
+        }
+    }
+}
