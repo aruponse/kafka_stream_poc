@@ -1,0 +1,11 @@
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/KafkaStreamPocApplication.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/config/KafkaStreamsConfig.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/service/KafkaPersistenceService.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/service/ProcessedEventService.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/controller/EventController.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/dto/NewFormatEvent.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/repository/ProcessedEventRepository.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/dto/SimpleEvent.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/dto/LegacyEvent.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/model/ProcessedEvent.java
+/Users/alfonso/Projects/Java/kafka_stream_poc/src/main/java/com/example/kafkastream/dto/GenericAction.java

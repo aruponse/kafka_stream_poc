@@ -1,0 +1,11 @@
+com/example/kafkastream/service/KafkaPersistenceService.class
+com/example/kafkastream/KafkaStreamPocApplication.class
+com/example/kafkastream/repository/ProcessedEventRepository.class
+com/example/kafkastream/service/ProcessedEventService.class
+com/example/kafkastream/dto/SimpleEvent.class
+com/example/kafkastream/dto/GenericAction.class
+com/example/kafkastream/dto/LegacyEvent.class
+com/example/kafkastream/config/KafkaStreamsConfig.class
+com/example/kafkastream/controller/EventController.class
+com/example/kafkastream/model/ProcessedEvent.class
+com/example/kafkastream/dto/NewFormatEvent.class

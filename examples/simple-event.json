@@ -1,0 +1,5 @@
+{
+  "id": "simple-001",
+  "payload": "hello world from kafka streams",
+  "timestamp": 1640995200000
+}
