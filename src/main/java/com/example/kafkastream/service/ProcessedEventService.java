@@ -4,7 +4,6 @@ import com.example.kafkastream.model.ProcessedEvent;
 import com.example.kafkastream.repository.ProcessedEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +21,6 @@ public class ProcessedEventService {
 
     private final ProcessedEventRepository processedEventRepository;
 
-    @Autowired
     public ProcessedEventService(ProcessedEventRepository processedEventRepository) {
         this.processedEventRepository = processedEventRepository;
     }
@@ -50,7 +48,7 @@ public class ProcessedEventService {
     @Transactional(readOnly = true)
     public List<ProcessedEvent> getAllProcessedEvents() {
         logger.info("Retrieving all processed events");
-        return processedEventRepository.findAllOrderedByProcessedAtDesc();
+        return processedEventRepository.findAllByOrderByProcessedAtDesc();
     }
 
     /**

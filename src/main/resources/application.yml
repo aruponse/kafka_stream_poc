@@ -23,52 +23,53 @@ spring:
       hibernate:
         format_sql: true
 
-  # Kafka Configuration
+  # Kafka Configuration with JSON Support
   kafka:
     bootstrap-servers: localhost:9092
     
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      properties:
-        spring.json.add.type.headers: false
     
     consumer:
       group-id: kafka-stream-poc-group
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "*"
-        spring.json.use.type.headers: false
+        "[spring.json.trusted.packages]": "com.example.kafkastream.dto"
     
     streams:
       application-id: kafka-streams-poc-app
       bootstrap-servers: localhost:9092
-      default:
-        key-serde: org.apache.kafka.common.serialization.Serdes$StringSerde
-        value-serde: org.apache.kafka.common.serialization.Serdes$StringSerde
       properties:
-        default.key.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
-        default.value.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
-        commit.interval.ms: 1000
-        cache.max.bytes.buffering: 0
+        "[default.key.serde]": org.apache.kafka.common.serialization.Serdes$StringSerde
+        "[default.value.serde]": org.apache.kafka.common.serialization.Serdes$StringSerde
+        "[commit.interval.ms]": 1000
+        "[cache.max.bytes.buffering]": 0
+        "[default.deserialization.exception.handler]": org.apache.kafka.streams.errors.LogAndContinueExceptionHandler
 
 # Custom Topic Configuration
 app:
   kafka:
     topics:
       input-topic: input-topic
+      legacy-events-topic: legacy-events-topic
       actions-topic: actions-topic
       output-topic-transformed: output-topic-transformed
       output-topic-json-converted: output-topic-json-converted
       output-topic-action-a: output-topic-action-a
       output-topic-action-b: output-topic-action-b
+      inbound-message-topic: inbound-message-topic
+      create-chat-topic: create-chat-topic
+      create-message-topic: create-message-topic
 
 server:
-  port: 8081
+  port: 8082
 
 logging:
   level:
-    org.apache.kafka: INFO
-    org.springframework.kafka: DEBUG
-    com.example.kafkastream: DEBUG
+    root: INFO
+    "[org.apache.kafka]": DEBUG
+    "[org.springframework.kafka]": DEBUG
+    "[com.example.kafkastream]": DEBUG
+    '[org.apache.kafka.streams]': DEBUG

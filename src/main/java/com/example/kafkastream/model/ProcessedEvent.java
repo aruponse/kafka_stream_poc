@@ -22,6 +22,9 @@ public class ProcessedEvent {
     @Column(name = "original_key")
     private String originalKey;
     
+    @Column(name = "original_event_id")
+    private String originalEventId; // Links to OriginalEvent.eventId
+    
     @Column(name = "processed_data", columnDefinition = "TEXT")
     private String processedData;
     
@@ -38,6 +41,15 @@ public class ProcessedEvent {
     public ProcessedEvent(String eventType, String originalKey, String processedData, String sourceTopic) {
         this.eventType = eventType;
         this.originalKey = originalKey;
+        this.processedData = processedData;
+        this.sourceTopic = sourceTopic;
+        this.processedAt = Instant.now();
+    }
+
+    public ProcessedEvent(String eventType, String originalKey, String originalEventId, String processedData, String sourceTopic) {
+        this.eventType = eventType;
+        this.originalKey = originalKey;
+        this.originalEventId = originalEventId;
         this.processedData = processedData;
         this.sourceTopic = sourceTopic;
         this.processedAt = Instant.now();
@@ -83,6 +95,14 @@ public class ProcessedEvent {
         this.sourceTopic = sourceTopic;
     }
 
+    public String getOriginalEventId() {
+        return originalEventId;
+    }
+
+    public void setOriginalEventId(String originalEventId) {
+        this.originalEventId = originalEventId;
+    }
+
     public Instant getProcessedAt() {
         return processedAt;
     }
@@ -97,6 +117,7 @@ public class ProcessedEvent {
                 "id=" + id +
                 ", eventType='" + eventType + '\'' +
                 ", originalKey='" + originalKey + '\'' +
+                ", originalEventId='" + originalEventId + '\'' +
                 ", processedData='" + processedData + '\'' +
                 ", sourceTopic='" + sourceTopic + '\'' +
                 ", processedAt=" + processedAt +

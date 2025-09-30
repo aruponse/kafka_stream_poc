@@ -28,8 +28,7 @@ public interface ProcessedEventRepository extends JpaRepository<ProcessedEvent, 
     /**
      * Find all processed events ordered by processed date (newest first)
      */
-    @Query("SELECT pe FROM ProcessedEvent pe ORDER BY pe.processedAt DESC")
-    List<ProcessedEvent> findAllOrderedByProcessedAtDesc();
+    List<ProcessedEvent> findAllByOrderByProcessedAtDesc();
 
     /**
      * Count events by event type

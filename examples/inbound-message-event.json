@@ -1,0 +1,18 @@
+{
+    "app": "NoeSushi",
+    "timestamp": 1747854609182,
+    "version": 2,
+    "type": "message",
+    "payload": {
+        "id": "wamid.HBgMNTkzxhgfjg3Nxc5NzU3FZCqEazxcE1ODg0QUIzQTg4NjUa4NUR1BQzYB",
+        "source": "593987699757",
+        "type": "text",
+        "payload": { "text": "3" },
+        "sender": { 
+            "phone": "593987699757",
+            "name": "Aruponse",
+            "country_code": "593",
+            "dial_code": "987699757"
+        }
+    }
+}

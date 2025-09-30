@@ -3,7 +3,7 @@
 # Test script for Kafka Streams PoC API endpoints
 # Usage: ./test-api.sh
 
-BASE_URL="http://localhost:8081/api/events"
+BASE_URL="http://localhost:8082/api/events"
 
 echo "==================================="
 echo "Kafka Streams PoC - API Testing"
@@ -59,7 +59,7 @@ echo "✅ Server is running!"
 echo ""
 
 # Test Case 1: SimpleEvent (Content Transformation)
-post_request "/simple/typed" "examples/simple-event.json" "Use Case 1: SimpleEvent Transformation"
+post_request "/simple" "examples/simple-event.json" "Use Case 1: SimpleEvent Transformation"
 
 # Test Case 2: LegacyEvent (JSON Schema Conversion)
 post_request "/legacy" "examples/legacy-event.json" "Use Case 2: LegacyEvent Conversion"
@@ -69,6 +69,9 @@ post_request "/action" "examples/action-a.json" "Use Case 3A: GenericAction Type
 
 # Test Case 3B: GenericAction Type B (Routing)
 post_request "/action" "examples/action-b.json" "Use Case 3B: GenericAction Type B"
+
+# Test Case 4: InboundMessageEvent (Message Processing)
+post_request "/inbound-message" "examples/inbound-message-event.json" "Use Case 4: InboundMessageEvent Processing"
 
 # Wait for processing
 echo "Waiting 5 seconds for all events to be processed..."
@@ -91,7 +94,7 @@ echo "API Testing Complete!"
 echo "==================================="
 echo ""
 echo "You can also access the H2 Console at:"
-echo "http://localhost:8081/h2-console"
+echo "http://localhost:8082/h2-console"
 echo "JDBC URL: jdbc:h2:mem:testdb"
 echo "Username: sa"
 echo "Password: (empty)"

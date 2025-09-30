@@ -3,13 +3,14 @@ package com.example.kafkastream.controller;
 import com.example.kafkastream.dto.GenericAction;
 import com.example.kafkastream.dto.LegacyEvent;
 import com.example.kafkastream.dto.SimpleEvent;
+import com.example.kafkastream.dto.InboundMessageEvent;
+import com.example.kafkastream.model.OriginalEvent;
 import com.example.kafkastream.model.ProcessedEvent;
+import com.example.kafkastream.service.OriginalEventService;
 import com.example.kafkastream.service.ProcessedEventService;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,8 +35,9 @@ public class EventController {
 
     private static final Logger logger = LoggerFactory.getLogger(EventController.class);
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ProcessedEventService processedEventService;
+    private final OriginalEventService originalEventService;
     private final ObjectMapper objectMapper;
 
     @Value("${app.kafka.topics.input-topic}")
@@ -44,77 +46,62 @@ public class EventController {
     @Value("${app.kafka.topics.actions-topic}")
     private String actionsTopic;
 
-    @Autowired
-    public EventController(KafkaTemplate<String, String> kafkaTemplate,
+    @Value("${app.kafka.topics.inbound-message-topic}")
+    private String inboundMessageTopic;
+
+    public EventController(KafkaTemplate<String, Object> kafkaTemplate,
                           ProcessedEventService processedEventService,
+                          OriginalEventService originalEventService,
                           ObjectMapper objectMapper) {
         this.kafkaTemplate = kafkaTemplate;
         this.processedEventService = processedEventService;
+        this.originalEventService = originalEventService;
         this.objectMapper = objectMapper;
     }
 
     /**
      * POST /api/events/simple
-     * Accepts SimpleEvent or LegacyEvent and publishes to input-topic for Use Cases 1 and 2
+     * Accepts SimpleEvent as JSON and publishes JSON to input-topic - Use Case 1
      */
     @PostMapping("/simple")
     public ResponseEntity<Map<String, Object>> publishSimpleEvent(@RequestBody Map<String, Object> eventData) {
         try {
-            String key = UUID.randomUUID().toString();
-            String jsonMessage = objectMapper.writeValueAsString(eventData);
+            // Create SimpleEvent from JSON data
+            SimpleEvent simpleEvent = new SimpleEvent(
+                    eventData.get("id") != null ? eventData.get("id").toString() : UUID.randomUUID().toString(),
+                    eventData.get("payload") != null ? eventData.get("payload").toString() : "",
+                    eventData.get("timestamp") != null ? 
+                            Long.valueOf(eventData.get("timestamp").toString()) : System.currentTimeMillis()
+            );
             
-            logger.info("Publishing event to {}: key={}, message={}", inputTopic, key, jsonMessage);
+            String key = simpleEvent.getId();
             
-            kafkaTemplate.send(inputTopic, key, jsonMessage);
+            logger.info("Publishing SimpleEvent (JSON) to {}: key={}, id={}, payload={}", 
+                      inputTopic, key, simpleEvent.getId(), simpleEvent.getPayload());
             
-            return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "message", "Event published successfully to " + inputTopic,
-                "key", key,
-                "topic", inputTopic,
-                "data", eventData
-            ));
+            // Save original event for tracking
+            String jsonData = objectMapper.writeValueAsString(simpleEvent);
+            OriginalEvent originalEvent = new OriginalEvent(key, "SimpleEvent", inputTopic, jsonData);
+            originalEventService.saveOriginalEvent(originalEvent);
             
-        } catch (JsonProcessingException e) {
-            logger.error("Error serializing event data", e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "status", "error",
-                "message", "Invalid JSON format: " + e.getMessage()
-            ));
-        } catch (Exception e) {
-            logger.error("Error publishing simple event", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                "status", "error",
-                "message", "Failed to publish event: " + e.getMessage()
-            ));
-        }
-    }
-
-    /**
-     * POST /api/events/simple/typed
-     * Typed endpoint for SimpleEvent - Use Case 1
-     */
-    @PostMapping("/simple/typed")
-    public ResponseEntity<Map<String, Object>> publishTypedSimpleEvent(@RequestBody SimpleEvent simpleEvent) {
-        try {
-            String key = simpleEvent.getId() != null ? simpleEvent.getId() : UUID.randomUUID().toString();
-            String jsonMessage = objectMapper.writeValueAsString(simpleEvent);
-            
-            logger.info("Publishing SimpleEvent to {}: key={}, message={}", inputTopic, key, jsonMessage);
-            
-            kafkaTemplate.send(inputTopic, key, jsonMessage);
+            kafkaTemplate.send(inputTopic, key, simpleEvent);
             
             return ResponseEntity.ok(Map.of(
                 "status", "success",
-                "message", "SimpleEvent published successfully to " + inputTopic,
+                "message", "SimpleEvent published successfully to " + inputTopic + " using JSON serialization",
                 "key", key,
                 "topic", inputTopic,
                 "eventType", "SimpleEvent",
-                "data", simpleEvent
+                "data", Map.of(
+                    "id", simpleEvent.getId(),
+                    "payload", simpleEvent.getPayload(),
+                    "timestamp", simpleEvent.getTimestamp()
+                ),
+                "originalEventId", originalEvent.getId()
             ));
             
         } catch (Exception e) {
-            logger.error("Error publishing typed simple event", e);
+            logger.error("Error publishing simple event", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "status", "error",
                 "message", "Failed to publish SimpleEvent: " + e.getMessage()
@@ -124,25 +111,41 @@ public class EventController {
 
     /**
      * POST /api/events/legacy
-     * Typed endpoint for LegacyEvent - Use Case 2
+     * Accepts LegacyEvent as JSON and publishes JSON to input-topic - Use Case 2
      */
     @PostMapping("/legacy")
-    public ResponseEntity<Map<String, Object>> publishLegacyEvent(@RequestBody LegacyEvent legacyEvent) {
+    public ResponseEntity<Map<String, Object>> publishLegacyEvent(@RequestBody Map<String, Object> eventData) {
         try {
+            // Create LegacyEvent from JSON data
+            LegacyEvent legacyEvent = new LegacyEvent(
+                    eventData.get("old_field_name") != null ? 
+                            eventData.get("old_field_name").toString() : "",
+                    eventData.get("value") != null ? eventData.get("value").toString() : ""
+            );
+            
             String key = UUID.randomUUID().toString();
-            String jsonMessage = objectMapper.writeValueAsString(legacyEvent);
             
-            logger.info("Publishing LegacyEvent to {}: key={}, message={}", inputTopic, key, jsonMessage);
+            logger.info("Publishing LegacyEvent (JSON) to {}: key={}, oldFieldName={}, value={}", 
+                      inputTopic, key, legacyEvent.getOldFieldName(), legacyEvent.getValue());
             
-            kafkaTemplate.send(inputTopic, key, jsonMessage);
+            // Save original event for tracking
+            String jsonData = objectMapper.writeValueAsString(legacyEvent);
+            OriginalEvent originalEvent = new OriginalEvent(key, "LegacyEvent", inputTopic, jsonData);
+            originalEventService.saveOriginalEvent(originalEvent);
+            
+            kafkaTemplate.send(inputTopic, key, legacyEvent);
             
             return ResponseEntity.ok(Map.of(
                 "status", "success",
-                "message", "LegacyEvent published successfully to " + inputTopic,
+                "message", "LegacyEvent published successfully to " + inputTopic + " using JSON serialization",
                 "key", key,
                 "topic", inputTopic,
                 "eventType", "LegacyEvent",
-                "data", legacyEvent
+                "data", Map.of(
+                    "old_field_name", legacyEvent.getOldFieldName(),
+                    "value", legacyEvent.getValue()
+                ),
+                "originalEventId", originalEvent.getId()
             ));
             
         } catch (Exception e) {
@@ -156,25 +159,42 @@ public class EventController {
 
     /**
      * POST /api/events/action
-     * Accepts GenericAction and publishes to actions-topic for Use Case 3
+     * Accepts GenericAction as JSON and publishes JSON to actions-topic - Use Case 3
      */
     @PostMapping("/action")
-    public ResponseEntity<Map<String, Object>> publishActionEvent(@RequestBody GenericAction genericAction) {
+    public ResponseEntity<Map<String, Object>> publishActionEvent(@RequestBody Map<String, Object> actionData) {
         try {
+            // Create GenericAction from JSON data
+            GenericAction genericAction = new GenericAction(
+                    actionData.get("actionType") != null ? 
+                            actionData.get("actionType").toString() : "",
+                    actionData.get("details") != null ? 
+                            actionData.get("details").toString() : ""
+            );
+            
             String key = UUID.randomUUID().toString();
-            String jsonMessage = objectMapper.writeValueAsString(genericAction);
             
-            logger.info("Publishing GenericAction to {}: key={}, message={}", actionsTopic, key, jsonMessage);
+            logger.info("Publishing GenericAction (JSON) to {}: key={}, actionType={}, details={}", 
+                      actionsTopic, key, genericAction.getActionType(), genericAction.getDetails());
             
-            kafkaTemplate.send(actionsTopic, key, jsonMessage);
+            // Save original event for tracking
+            String jsonData = objectMapper.writeValueAsString(genericAction);
+            OriginalEvent originalEvent = new OriginalEvent(key, "GenericAction", actionsTopic, jsonData);
+            originalEventService.saveOriginalEvent(originalEvent);
+            
+            kafkaTemplate.send(actionsTopic, key, genericAction);
             
             return ResponseEntity.ok(Map.of(
                 "status", "success",
-                "message", "GenericAction published successfully to " + actionsTopic,
+                "message", "GenericAction published successfully to " + actionsTopic + " using JSON serialization",
                 "key", key,
                 "topic", actionsTopic,
-                "actionType", genericAction.getActionType(),
-                "data", genericAction
+                "eventType", "GenericAction",
+                "data", Map.of(
+                    "actionType", genericAction.getActionType(),
+                    "details", genericAction.getDetails()
+                ),
+                "originalEventId", originalEvent.getId()
             ));
             
         } catch (Exception e) {
@@ -182,6 +202,104 @@ public class EventController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "status", "error",
                 "message", "Failed to publish GenericAction: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * POST /api/events/inbound-message
+     * Accepts InboundMessageEvent as JSON and publishes JSON to inbound-message-topic - Use Case 4
+     */
+    @PostMapping("/inbound-message")
+    public ResponseEntity<Map<String, Object>> publishInboundMessageEvent(@RequestBody Map<String, Object> eventData) {
+        try {
+            logger.info("Received inbound message event data: {}", eventData);
+            
+            // Extract main event properties
+            String app = eventData.get("app") != null ? eventData.get("app").toString() : "NoeSushi";
+            Long timestamp = eventData.get("timestamp") != null ? 
+                    Long.valueOf(eventData.get("timestamp").toString()) : System.currentTimeMillis();
+            Integer version = eventData.get("version") != null ? 
+                    Integer.valueOf(eventData.get("version").toString()) : 2;
+            String type = eventData.get("type") != null ? eventData.get("type").toString() : "message";
+            
+            // Extract payload data
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payloadData = (Map<String, Object>) eventData.get("payload");
+            if (payloadData == null) {
+                throw new IllegalArgumentException("Payload is required");
+            }
+            
+            String messageId = payloadData.get("id") != null ? payloadData.get("id").toString() : "";
+            String source = payloadData.get("source") != null ? payloadData.get("source").toString() : "";
+            String messageType = payloadData.get("type") != null ? payloadData.get("type").toString() : "text";
+            
+            // Extract nested payload (message content)
+            @SuppressWarnings("unchecked")
+            Map<String, Object> messageContentData = (Map<String, Object>) payloadData.get("payload");
+            String text = "";
+            if (messageContentData != null && messageContentData.get("text") != null) {
+                text = messageContentData.get("text").toString();
+            }
+            InboundMessageEvent.MessageContent messageContent = new InboundMessageEvent.MessageContent(text);
+            
+            // Extract sender data
+            @SuppressWarnings("unchecked")
+            Map<String, Object> senderData = (Map<String, Object>) payloadData.get("sender");
+            InboundMessageEvent.Sender sender = null;
+            if (senderData != null) {
+                String phone = senderData.get("phone") != null ? senderData.get("phone").toString() : "";
+                String name = senderData.get("name") != null ? senderData.get("name").toString() : "";
+                String countryCode = senderData.get("country_code") != null ? senderData.get("country_code").toString() : "";
+                String dialCode = senderData.get("dial_code") != null ? senderData.get("dial_code").toString() : "";
+                sender = new InboundMessageEvent.Sender(phone, name, countryCode, dialCode);
+            }
+            
+            // Create message payload
+            InboundMessageEvent.MessagePayload messagePayload = new InboundMessageEvent.MessagePayload(
+                    messageId, source, messageType, messageContent, sender);
+            
+            // Create InboundMessageEvent
+            InboundMessageEvent inboundMessageEvent = new InboundMessageEvent(
+                    app, timestamp, version, type, messagePayload);
+            
+            String key = messageId; // Use message ID as key
+            
+            logger.info("Publishing InboundMessageEvent (JSON) to {}: key={}, app={}, messageId={}", 
+                      inboundMessageTopic, key, app, messageId);
+            
+            // Save original event for tracking
+            String jsonData = objectMapper.writeValueAsString(inboundMessageEvent);
+            OriginalEvent originalEvent = new OriginalEvent(key, "InboundMessageEvent", inboundMessageTopic, jsonData);
+            originalEventService.saveOriginalEvent(originalEvent);
+            
+            kafkaTemplate.send(inboundMessageTopic, key, inboundMessageEvent);
+            
+            return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "InboundMessageEvent published successfully to " + inboundMessageTopic + " using JSON serialization",
+                "key", key,
+                "topic", inboundMessageTopic,
+                "eventType", "InboundMessageEvent",
+                "data", Map.of(
+                    "app", inboundMessageEvent.getApp(),
+                    "timestamp", inboundMessageEvent.getTimestamp(),
+                    "version", inboundMessageEvent.getVersion(),
+                    "type", inboundMessageEvent.getType(),
+                    "messageId", inboundMessageEvent.getPayload().getId(),
+                    "source", inboundMessageEvent.getPayload().getSource(),
+                    "senderName", inboundMessageEvent.getPayload().getSender().getName(),
+                    "content", inboundMessageEvent.getPayload().getPayload().getText()
+                ),
+                "originalEventId", originalEvent.getId(),
+                "note", "This event will be transformed into CreateChatEvent and CreateMessageEvent"
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error publishing inbound message event", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "status", "error",
+                "message", "Failed to publish InboundMessageEvent: " + e.getMessage()
             ));
         }
     }
@@ -260,6 +378,46 @@ public class EventController {
     }
 
     /**
+     * GET /api/events/original
+     * Retrieves all original events from H2 database
+     */
+    @GetMapping("/original")
+    public ResponseEntity<Map<String, Object>> getOriginalEvents(
+            @RequestParam(required = false) String eventType,
+            @RequestParam(required = false) String sourceTopic) {
+        try {
+            List<OriginalEvent> events;
+            
+            if (eventType != null) {
+                events = originalEventService.getOriginalEventsByType(eventType);
+            } else if (sourceTopic != null) {
+                events = originalEventService.getOriginalEventsBySourceTopic(sourceTopic);
+            } else {
+                events = originalEventService.getAllOriginalEvents();
+            }
+            
+            logger.info("Retrieved {} original events", events.size());
+            
+            return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "count", events.size(),
+                "events", events,
+                "filters", Map.of(
+                    "eventType", eventType != null ? eventType : "all",
+                    "sourceTopic", sourceTopic != null ? sourceTopic : "all"
+                )
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error retrieving original events", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "status", "error",
+                "message", "Failed to retrieve original events: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
      * DELETE /api/events/processed
      * Deletes all processed events (useful for testing)
      */
@@ -279,6 +437,30 @@ public class EventController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "status", "error",
                 "message", "Failed to delete processed events: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * DELETE /api/events/original
+     * Deletes all original events (useful for testing)
+     */
+    @DeleteMapping("/original")
+    public ResponseEntity<Map<String, Object>> deleteAllOriginalEvents() {
+        try {
+            originalEventService.deleteAllOriginalEvents();
+            logger.info("All original events deleted");
+            
+            return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "All original events deleted successfully"
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error deleting original events", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "status", "error",
+                "message", "Failed to delete original events: " + e.getMessage()
             ));
         }
     }
